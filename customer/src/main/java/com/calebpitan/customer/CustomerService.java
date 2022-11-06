@@ -1,11 +1,20 @@
 package com.calebpitan.customer;
 
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 @Service
-public record CustomerService(CustomerRepository customerRepository) {
+@AllArgsConstructor
+public class CustomerService {
+
+    final CustomerRepository customerRepository;
+
+    final private RestTemplate restTemplate;
+
     public void registerCustomer(CustomerRegistrationRequest request) {
-        Customer customer = Customer.builder()
+        Customer customer = Customer
+                .builder()
                 .firstName(request.firstName())
                 .lastName(request.lastName())
                 .email(request.email())
@@ -13,7 +22,19 @@ public record CustomerService(CustomerRepository customerRepository) {
 
         // todo: check if email is valid
         // todo: check if email not taken
+        // todo: check if fraudster
+        customerRepository.saveAndFlush(customer);
 
-        customerRepository.save(customer);
+        FraudCheckResponse fraudCheckResponse = restTemplate.getForObject(
+                "http://localhost:8110/api/v1/fraud-check/{customerId}",
+                FraudCheckResponse.class,
+                customer.getId()
+        );
+
+        if (fraudCheckResponse.isFraudster()) {
+            throw new IllegalStateException("Fraudster");
+        }
+
+        // todo: send notification
     }
 }
